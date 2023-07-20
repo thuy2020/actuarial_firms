@@ -1,0 +1,80 @@
+---
+title: "Actuarial Firms"
+output: html_document
+date: "2023-07-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(stringr)
+```
+
+## 2016
+Total net pension liabilities and total liabilities are from table ppd_annual_attribute
+```{r}
+firm_name <- rio::import("data/actuarial_firm_name.csv") %>% distinct()
+liabilities <- rio::import("data/total_net_pension_liability.csv")
+
+# standardize all names
+firm_name %>% 
+  #clean
+    mutate(acturial_firm_name = str_to_title(acturial_firm_name),
+         acturial_firm_name = str_squish(acturial_firm_name)) %>% 
+  
+  #harmonize names
+  mutate(acturial_firm_name_new = 
+           case_when(str_detect(acturial_firm_name, "(i?)Gabriel|Grs") ~ 
+                       "Gabriel, Roeder, Smith & Company (GRS)", 
+                     
+                    str_detect(acturial_firm_name, "(i?)Cavan") ~ 
+                      "Cavanaugh Macdonald Consulting",
+                    
+                    str_detect(acturial_firm_name, "(i?)Segal") ~
+                    "Segal Consulting",
+                    
+                    str_detect(acturial_firm_name, "(i?)California") ~
+                    "California Public Employees’ Retirement System - Actuarial Office",
+                    
+                    
+                    str_detect(acturial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
+                      "Conduent (formerly Buck and/or Xerox)",
+                    
+                    str_detect(acturial_firm_name, "(i?)Che") ~
+                    "Cheiron",
+                    str_detect(acturial_firm_name, "(i?)Foster") ~
+                    "Foster & Foster, Actuaries and Consultants",
+                    
+                    str_detect(acturial_firm_name, "(i?)Bartel") ~
+                    "Bartel Associates",
+                    str_detect(acturial_firm_name, "(i?)Milliman") ~
+                    "Milliman",
+                    
+                    str_detect(acturial_firm_name, "(i?)Block") ~
+                    "Block Consulting Actuaries",
+                    str_detect(acturial_firm_name, "(i?)Bolton") ~
+                    "Bolton Partners",
+                    
+                    str_detect(acturial_firm_name, "(i?)Curran") ~
+                    "G.S.Curran & Company",
+                    
+                    str_detect(acturial_firm_name, "(i?)Korn") ~
+                    "Korn Ferry Hay Group",
+                    str_detect(acturial_firm_name, "(i?)Internal") ~
+                    "Internal Actuarial Services",
+                    str_detect(acturial_firm_name, "(i?)Osborn") ~
+                    "Osborn, Carreiro & Associates",
+                                        TRUE ~ acturial_firm_name)) %>% 
+  
+#select(acturial_firm_name_new) %>% distinct() %>% arrange(acturial_firm_name_new)
+
+select(-acturial_firm_name) %>% 
+
+  left_join(liabilities) %>% filter(year == 2016) %>% 
+  group_by(acturial_firm_name_new) %>% 
+  mutate(tot_total_liabilities = sum(totalpensionliability)) %>% 
+  select(acturial_firm_name_new, tot_total_liabilities) %>% 
+  arrange(desc(tot_total_liabilities)) %>% 
+  distinct()
+```
+
