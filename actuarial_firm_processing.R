@@ -5,7 +5,11 @@ library(rio)
 
 reason_data <- import("data/master_attribute_actuarial_firms.csv")
 ppd_data <- import("data/ppd-data-latest.csv")
-actuarial_firm_supplemental <- import("data/actuarial firm supplemental.xlsx")
+
+actuarial_firm_supplemental <- import("data/actuarial firm supplemental.xlsx") %>% 
+  # unify firm names
+mutate(actuarial_firm_name_supplemental = ifelse(actuarial_firm_name_supplemental == "Segal Consulting", "Segal", 
+                                              actuarial_firm_name_supplemental))
 
 #Clean PPD data
 ppd_data_clean <- ppd_data %>% 
