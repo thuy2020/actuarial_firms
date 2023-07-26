@@ -8,16 +8,50 @@ date: "2023-07-20"
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(stringr)
+library(ggplot2)
+options(scipen = 999)
 ```
 
-## 2016
-Total net pension liabilities and total liabilities are from table ppd_annual_attribute
+```{r}
+data <- rio::import("Actuarial Firm Summary.xlsx", sheet = 2) %>% 
+  mutate(AAL_percent = round(AAL_percent*100, 1),
+         AAL_billion = round(AAL/1000000000),
+         AAL_billion = paste0("$", AAL_billion, "B")) 
+
+  mutate(AAL = prettyNum(AAL, big.mark = ","),
+         UAL = prettyNum(UAL, big.mark = ","))
+
+  
+```
+```{r}
+data
+```
+
+
+```{r}
+data %>% 
+  ggplot(aes(fct_reorder(actuarial_firm_name, AAL), AAL)) +
+  geom_col(fill = "#FF6632") +
+  geom_text(aes(label = AAL_billion), color = "black", size = 2, 
+            nudge_y = -30000000000) +
+  coord_flip() +
+  labs(x = "") +
+  scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
+                   label = c("$500B","$1T","$1.5T")) +
+  theme(plot.margin = margin(2, 8, 6, 2, "pt")) +
+  theme_minimal() 
+  
+```
+```{r}
+data
+```
+
+
+
+
+## Clean names
 ```{r}
 firm_name <- rio::import("data/actuarial_firm_name.csv") %>% distinct()
-liabilities <- rio::import("data/total_net_pension_liability.csv")
-
-# standardize all names
-firm_name %>% 
   #clean
     mutate(acturial_firm_name = str_to_title(acturial_firm_name),
          acturial_firm_name = str_squish(acturial_firm_name)) %>% 
@@ -64,17 +98,6 @@ firm_name %>%
                     "Internal Actuarial Services",
                     str_detect(acturial_firm_name, "(i?)Osborn") ~
                     "Osborn, Carreiro & Associates",
-                                        TRUE ~ acturial_firm_name)) %>% 
-  
-#select(acturial_firm_name_new) %>% distinct() %>% arrange(acturial_firm_name_new)
-
-select(-acturial_firm_name) %>% 
-
-  left_join(liabilities) %>% filter(year == 2016) %>% 
-  group_by(acturial_firm_name_new) %>% 
-  mutate(tot_total_liabilities = sum(totalpensionliability)) %>% 
-  select(acturial_firm_name_new, tot_total_liabilities) %>% 
-  arrange(desc(tot_total_liabilities)) %>% 
-  distinct()
+                                        TRUE ~ acturial_firm_name)) 
 ```
 
