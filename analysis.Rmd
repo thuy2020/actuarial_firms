@@ -13,91 +13,211 @@ options(scipen = 999)
 ```
 
 ```{r}
-data <- rio::import("Actuarial Firm Summary.xlsx", sheet = 2) %>% 
+data <- rio::import("Actuarial Firm Summary.xlsx", sheet = 2) %>% # shee2 = final_data_summary3_21
   mutate(AAL_percent = round(AAL_percent*100, 1),
          AAL_billion = round(AAL/1000000000),
-         AAL_billion = paste0("$", AAL_billion, "B")) 
+         AAL_billion = paste0("$", AAL_billion, "B"),
+         
+         UAL_billion = round(UAL/1000000000),
+         UAL_billion = paste0("$", UAL_billion, "B")) 
 
-  mutate(AAL = prettyNum(AAL, big.mark = ","),
-         UAL = prettyNum(UAL, big.mark = ","))
+  # mutate(AAL = prettyNum(AAL, big.mark = ","),
+  #        UAL = prettyNum(UAL, big.mark = ","))
 
   
 ```
-```{r}
-data
-```
 
 
+# Top 15 firms in 2021 AAL
 ```{r}
 data %>% 
   ggplot(aes(fct_reorder(actuarial_firm_name, AAL), AAL)) +
   geom_col(fill = "#FF6632") +
+  geom_col(data = data %>% filter(actuarial_firm_name == "Others"), 
+           fill = "gray")+
+  
   geom_text(aes(label = AAL_billion), color = "black", size = 2, 
             nudge_y = -30000000000) +
   coord_flip() +
-  labs(x = "") +
+  labs(x = "", 
+       y = "Actuarial Accrued Liability") +
   scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
                    label = c("$500B","$1T","$1.5T")) +
   theme(plot.margin = margin(2, 8, 6, 2, "pt")) +
   theme_minimal() 
   
 ```
+
+# Top 15 firms in 2021 UAL
 ```{r}
-data
+data %>% 
+  ggplot(aes(fct_reorder(actuarial_firm_name, UAL), UAL)) +
+  geom_col(fill = "#0F9195") +
+  geom_col(data = data %>% filter(actuarial_firm_name == "Others"), 
+           fill = "gray")+
+  
+  geom_text(aes(label = UAL_billion), color = "black", size = 2, 
+            nudge_y = -20000000000) +
+  coord_flip() +
+  labs(x = "", 
+       y = "UAL") +
+  scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
+                   label = c("$500B","$1T","$1.5T")) +
+  theme(plot.margin = margin(2, 8, 6, 2, "pt")) +
+  theme_minimal() 
+  
+
+
+#How to count Buck, Xerox, Conduent? 
+#https://www.pionline.com/article/20180501/ONLINE/180509987/conduent-sells-former-buck-consultants-business-to-h-i-g-capital
+
+# Comparing AAL top 5: 2016 - 2021
+
+#Who has negative UAL/ overfuned?
+
+data %>% filter(UAL <0)
+
+```
+# Percentage share
+
+```{r}
+d_waffle_percentshare <- final_data_summary3_21 %>% select(actuarial_firm_name, AAL_percent) %>% 
+  mutate(AAL_percent = round(AAL_percent*100)) %>% arrange(desc(AAL_percent))
+
+
+
+waffle(c(GRS = 24, CMC = 15, Millian = 13, Segal = 11, CalPERS = 10, 
+         `Others` = 100-24-15-13-11-10), rows = 5,
+         title = "Percentage share of AAL by firms\n") +
+  coord_equal() +
+  labs(caption = "Note: Percentages are rounded up the nearest integers", size = 0.1) +
+  scale_fill_manual(name = NULL,
+                    values = c("#2E5079", "#3D5A42", "#0F9195", "#7FCDA1", "#B3BC92", "lightgrey")) +
+  theme_void()
+
+
 ```
 
 
+# Compareing 2016 - 2021
+```{r}
+
+compare_top5 <-  final_data_summary2_16 %>% rbind(final_data_summary2_21) %>% 
+  select(-AAL_percent) %>% 
+add_row(actuarial_firm_name = "CalPERS", Year = 2016, AAL = 441500000000, UAL = 142000000000) %>% 
+  arrange(desc(AAL)) %>% slice(1:10) %>% 
+
+  # The data does not have CalPERS 2016. Use number in the article https://reason.org/commentary/grs-dominates-public-pension-actuarial-consulting-followed-by-milliman-and-cavanaugh-macdonald/
+  
+  select(-UAL) %>% 
+  pivot_wider(names_from = Year,
+              values_from = AAL) %>% slice(1:5) %>% 
+  pivot_longer(cols = 2:3,
+    names_to = "Year",
+               values_to = "aal_value")
+
+```
+
+```{r}
+compare_top5 %>% 
+  filter(Year == 2021) %>% 
+  ggplot(aes(fct_reorder(actuarial_firm_name, aal_value), aal_value))+
+  
+  geom_col(data = compare_top5 %>% filter(Year == 2016),
+            aes(y = aal_value, fill = Year), width = 0.5) +
+   coord_flip()+
+  labs(x = "",
+       y = "Actuarial Accrued Liability") + 
+  scale_fill_manual(values = c("grey", "orange")) +
+  scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
+                   label = c("$500B","$1T","$1.5T"))+
+  theme_minimal() +
+  theme(panel.grid.major.y = element_blank()) 
+```
+
+```{r}
+num_plan_by_firm <- final_data_16_21 %>% select(actuarial_firm_name, fy) %>% 
+  #filter(fy == 2021) %>% 
+  group_by(fy) %>% 
+  add_count(actuarial_firm_name) %>% 
+  rename(number_plan = n,
+         Year = fy) %>% 
+  mutate(Year = as.character(Year)) %>% 
+  distinct()
+
+num_plan_by_firm %>% arrange(desc(number_plan))
+num_plan_by_firm %>% filter(str_detect(actuarial_firm_name, "Conduent"))
+```
+
+
+```{r}
+num_plan_by_firm %>%
+  filter(number_plan >2) %>% 
+  #filter(Year == "2021") %>% 
+  ggplot(aes(fct_reorder(actuarial_firm_name, number_plan), number_plan))+
+  geom_segment(aes(xend = actuarial_firm_name, yend = 0), size = 1, color = "grey") +
+
+  geom_point(aes(color = Year), position = "jitter", 
+             size = 6)+
+   coord_flip()+
+  labs(title = "Number of Plans by Actuarial Firms 2016-2021",
+        x = "",
+       y = "Number of plans") + 
+  theme_minimal() +
+  scale_color_brewer(palette = "Set2")+
+  theme(panel.grid.major.y = element_blank()) 
+```
 
 
 ## Clean names
 ```{r}
 firm_name <- rio::import("data/actuarial_firm_name.csv") %>% distinct()
   #clean
-    mutate(acturial_firm_name = str_to_title(acturial_firm_name),
-         acturial_firm_name = str_squish(acturial_firm_name)) %>% 
+    mutate(actuarial_firm_name = str_to_title(actuarial_firm_name),
+         actuarial_firm_name = str_squish(actuarial_firm_name)) %>% 
   
   #harmonize names
-  mutate(acturial_firm_name_new = 
-           case_when(str_detect(acturial_firm_name, "(i?)Gabriel|Grs") ~ 
+  mutate(actuarial_firm_name_new = 
+           case_when(str_detect(actuarial_firm_name, "(i?)Gabriel|Grs") ~ 
                        "Gabriel, Roeder, Smith & Company (GRS)", 
                      
-                    str_detect(acturial_firm_name, "(i?)Cavan") ~ 
+                    str_detect(actuarial_firm_name, "(i?)Cavan") ~ 
                       "Cavanaugh Macdonald Consulting",
                     
-                    str_detect(acturial_firm_name, "(i?)Segal") ~
+                    str_detect(actuarial_firm_name, "(i?)Segal") ~
                     "Segal Consulting",
                     
-                    str_detect(acturial_firm_name, "(i?)California") ~
+                    str_detect(actuarial_firm_name, "(i?)California") ~
                     "California Public Employees’ Retirement System - Actuarial Office",
                     
                     
-                    str_detect(acturial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
+                    str_detect(actuarial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
                       "Conduent (formerly Buck and/or Xerox)",
                     
-                    str_detect(acturial_firm_name, "(i?)Che") ~
+                    str_detect(actuarial_firm_name, "(i?)Che") ~
                     "Cheiron",
-                    str_detect(acturial_firm_name, "(i?)Foster") ~
+                    str_detect(actuarial_firm_name, "(i?)Foster") ~
                     "Foster & Foster, Actuaries and Consultants",
                     
-                    str_detect(acturial_firm_name, "(i?)Bartel") ~
+                    str_detect(actuarial_firm_name, "(i?)Bartel") ~
                     "Bartel Associates",
-                    str_detect(acturial_firm_name, "(i?)Milliman") ~
+                    str_detect(actuarial_firm_name, "(i?)Milliman") ~
                     "Milliman",
                     
-                    str_detect(acturial_firm_name, "(i?)Block") ~
+                    str_detect(actuarial_firm_name, "(i?)Block") ~
                     "Block Consulting Actuaries",
-                    str_detect(acturial_firm_name, "(i?)Bolton") ~
+                    str_detect(actuarial_firm_name, "(i?)Bolton") ~
                     "Bolton Partners",
                     
-                    str_detect(acturial_firm_name, "(i?)Curran") ~
+                    str_detect(actuarial_firm_name, "(i?)Curran") ~
                     "G.S.Curran & Company",
                     
-                    str_detect(acturial_firm_name, "(i?)Korn") ~
+                    str_detect(actuarial_firm_name, "(i?)Korn") ~
                     "Korn Ferry Hay Group",
-                    str_detect(acturial_firm_name, "(i?)Internal") ~
+                    str_detect(actuarial_firm_name, "(i?)Internal") ~
                     "Internal Actuarial Services",
-                    str_detect(acturial_firm_name, "(i?)Osborn") ~
+                    str_detect(actuarial_firm_name, "(i?)Osborn") ~
                     "Osborn, Carreiro & Associates",
-                                        TRUE ~ acturial_firm_name)) 
+                                        TRUE ~ actuarial_firm_name)) 
 ```
 

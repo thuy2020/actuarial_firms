@@ -54,6 +54,11 @@ actuarial_firm_data <- reason_data_clean %>%
                                            "SilverStone Group",
                                          str_detect(actuarial_firm_name, "(?i)dean") ~
                                            "Dean Actuaries",
+                                         
+                                         # check back with Truong & Zach 
+                                         str_detect(actuarial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
+                                           "Conduent (formerly Buck and/or Xerox)",
+                                         
                                          TRUE ~ actuarial_firm_name)) %>%
   select(-plan_id, -plan_name) %>% 
   distinct()
