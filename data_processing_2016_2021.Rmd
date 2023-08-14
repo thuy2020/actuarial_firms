@@ -6,21 +6,23 @@ date: "2023-07-26"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r}
 rm(list = ls())
 library(waffle)
 library(tidyverse)
 library(rio)
+```
 
+```{r}
 reason_data <- import("data/master_attribute_actuarial_firms.csv")
 ppd_data <- import("data/ppd-data-latest.csv")
 
 actuarial_firm_supplemental <- import("data/actuarial firm supplemental.xlsx") %>% 
   # unify firm names
 mutate(actuarial_firm_name_supplemental = ifelse(actuarial_firm_name_supplemental == "Segal Consulting", "Segal", 
+                                              actuarial_firm_name_supplemental)) %>% 
+mutate(actuarial_firm_name_supplemental = ifelse(actuarial_firm_name_supplemental == "Office of the State Actuary - Washington", "Office of The State Actuary - Washington", 
                                               actuarial_firm_name_supplemental))
+
 ```
 
 ```{r}
@@ -38,7 +40,6 @@ reason_data_clean_16_21 <- reason_data %>%
   mutate(ppd_id = as.integer(ppd_id)) %>% 
   semi_join(ppd_data_clean, by = "ppd_id") 
 
-
 ```
 
 
@@ -52,7 +53,8 @@ reason_data_clean_16_21 %>%
   rename(actuarial_firm_name = attribute_value,
          fy = year) %>% 
   select(-master_attribute_name) %>% 
-  mutate(actuarial_firm_name = str_to_title(actuarial_firm_name)) %>% select(actuarial_firm_name) %>% distinct() %>% arrange(actuarial_firm_name)
+  mutate(actuarial_firm_name = str_to_title(actuarial_firm_name)) %>% 
+  select(actuarial_firm_name) %>% distinct() %>% arrange(actuarial_firm_name)
 #--> Problem: a great variation of names, total 83 --> need to unify them below
 ```
 
@@ -65,24 +67,31 @@ actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>%
   select(-master_attribute_name) %>% 
   mutate(actuarial_firm_name = str_to_title(actuarial_firm_name)) %>% 
   
-  mutate(actuarial_firm_name = case_when(str_detect(actuarial_firm_name, "(?i)bolton") ~
+  mutate(actuarial_firm_name = case_when(
+    str_detect(actuarial_firm_name, "(?i)bolton") ~
                                            "Bolton",
-    str_detect(actuarial_firm_name, "(?i)buck") ~
-                                           "Buck",
+    #str_detect(actuarial_firm_name, "(?i)buck") ~
+    #                                       "Buck",
     str_detect(actuarial_firm_name, "(?i)cavan") ~ 
                                            "Cavanaugh Macdonald Consulting",
     str_detect(actuarial_firm_name, "(?i)cheiron|cherion") ~
                                            "Cheiron",
     
     # Check with Truong/ Zach about this. Should keep Buck as Buck or collapse into Conduent?
-    str_detect(actuarial_firm_name, "(i?)Conduent") ~ 
-                                           "Conduent",
+    #str_detect(actuarial_firm_name, "(i?)Conduent") ~ 
+     #                                      "Conduent",
     
-    #OR: 
-    # str_detect(actuarial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
-    #                   "Conduent (formerly Buck and/or Xerox)",
+    #####
+    #after checking with Zach, merge these together
+     str_detect(actuarial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
+                       "Conduent (formerly Buck and/or Xerox)",
     
-    #"Office Of The State Actuary" ~ "Office Of The State Actuary - Washington" ??? ~ "The Office Of The State Actuary"
+    str_detect(actuarial_firm_name,"(i?)Office Of The State Actuary")  ~ 
+                                    "Office of The State Actuary - Washington",
+   
+   str_detect(actuarial_firm_name, "(?i)State Actuary - Washington") ~
+                                           "Office of The State Actuary - Washington",
+    ########
     
     str_detect(actuarial_firm_name, "(?i)foster") ~
                                            "Foster & Foster",
@@ -111,10 +120,6 @@ actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>%
     str_detect(actuarial_firm_name, "(?i)dean") ~
                                            "Dean Actuaries",
     
-    str_detect(actuarial_firm_name, "(?i)State Actuary - Washington") ~
-                                           "Office of The State Actuary - Washington",
-    
-                                         
                                          TRUE ~ actuarial_firm_name)) %>%
   select(-plan_id, plan_name) %>% distinct()
   
@@ -122,7 +127,7 @@ actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>%
 
 actuarial_firm_data_16_21 %>% 
    select(actuarial_firm_name) %>% arrange(actuarial_firm_name) %>% 
-   distinct() %>% write.csv("distinct_firms_list.csv")
+   distinct() #%>% write.csv("distinct_firms_list.csv")
 ```
 
 ```{r}
@@ -144,7 +149,7 @@ final_data_16_21  <- ppd_data_clean %>%
   filter(fy %in% c(2016, 2021), !is.na(ActLiabilities_GASB), !is.na(MktAssets_net)) %>% 
   left_join(actuarial_firm_data_16_21) %>% 
   
-  # recheck names - still see some similar names here --> check with Truong/ Zach
+  # recheck names 
   #select(actuarial_firm_name) %>% distinct() %>% arrange(actuarial_firm_name)
 
   left_join(actuarial_firm_supplemental) %>% 
@@ -154,12 +159,24 @@ final_data_16_21  <- ppd_data_clean %>%
          UAL = ActLiabilities_GASB - MktAssets_net,
          .after = MktAssets_net) %>% 
   mutate(across(ActLiabilities_GASB:UAL, ~.x * 1000)) %>% 
-  filter(!is.na(actuarial_firm_name))
+  filter(!is.na(actuarial_firm_name)) %>% 
+  
+  mutate(actuarial_firm_name = case_when(
+  str_detect(actuarial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
+                       "Conduent (formerly Buck and/or Xerox)",
+  
+  str_detect(actuarial_firm_name, "(i?)Usi Consulting Group") ~ 
+                       "USI Consulting Group",
+  
+  TRUE ~ actuarial_firm_name))
 
-# double-check names
 
+# double-check names to make sure names are unique 
 final_data_16_21 %>% select(actuarial_firm_name) %>% distinct() %>% arrange(actuarial_firm_name)
 
+```
+
+```{r}
 # What plans are covered by GRS?
 final_data_16_21 %>% filter(fy == 2021) %>% 
   filter(str_detect(actuarial_firm_name, "GRS")) %>% 
@@ -199,6 +216,7 @@ final_data_16_21 %>% filter(fy == 2021) %>%
    group_by(actuarial_firm_name) %>% 
    mutate(tot = sum(UAL))  %>% select(actuarial_firm_name, tot)%>% arrange(tot) %>% distinct()
    
+
 ```
 
 ```{r}
@@ -231,7 +249,7 @@ final_data_summary_16_21 <- final_data_16_21 %>%
   mutate(AAL_percent = AAL / sum(AAL), .after = AAL) %>% 
   arrange(desc(AAL))
 
-final_data_summary_16_21 %>% filter(fy == 2021) %>% 
+final_data_summary_16_21 %>% filter(fy == 2021) 
   
 ```
 
@@ -256,8 +274,6 @@ final_data_summary2_21 <- final_data_summary_16_21 %>% filter(fy == 2021) %>%
             UAL = sum(UAL)) %>% 
   ungroup() %>% 
   mutate(AAL_percent = AAL / sum(AAL), .after = AAL) %>% mutate(Year = 2021)
-
-
 
 
 #Move the "Others" category to the bottom of the table for 2021

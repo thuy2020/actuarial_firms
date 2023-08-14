@@ -157,7 +157,7 @@ num_plan_by_firm %>%
   ggplot(aes(fct_reorder(actuarial_firm_name, number_plan), number_plan))+
   geom_segment(aes(xend = actuarial_firm_name, yend = 0), size = 1, color = "grey") +
 
-  geom_point(aes(color = Year), position = "jitter", 
+  geom_point(aes(color = Year), 
              size = 6)+
    coord_flip()+
   labs(title = "Number of Plans by Actuarial Firms 2016-2021",
