@@ -20,15 +20,15 @@ actuarial_firm_supplemental <- import("data/actuarial firm supplemental.xlsx") %
 
 # clean some more names from actuarial_firm_supplemental
   mutate(actuarial_firm_name_supplemental = case_when(
-  str_detect(actuarial_firm_name_supplemental, "(i?)Buck|Xerox|Conduent") ~ 
+  str_detect(actuarial_firm_name_supplemental, "(?i)Buck|Xerox|Conduent") ~ 
                        "Conduent (formerly Buck and/or Xerox)",
   
-  str_detect(actuarial_firm_name_supplemental, "(i?)Usi Consulting Group") ~ 
+  str_detect(actuarial_firm_name_supplemental, "(?i)Usi Consulting Group") ~ 
                        "USI Consulting Group",
   
-  str_detect(actuarial_firm_name_supplemental, "(i?)Office of the State Actuary - Washington") ~ 
+  str_detect(actuarial_firm_name_supplemental, "(?i)Office of the State Actuary - Washington") ~ 
                        "Office of The State Actuary - Washington",
-  str_detect(actuarial_firm_name_supplemental, "(i?)Segal") ~ 
+  str_detect(actuarial_firm_name_supplemental, "(?i)Segal") ~ 
                        "Segal",
   
   TRUE ~ actuarial_firm_name_supplemental))
@@ -41,9 +41,9 @@ actuarial_firm_supplemental %>% select(actuarial_firm_name_supplemental) %>% dis
 ppd_data_clean <- ppd_data %>% 
   mutate(PlanFullName = gsub("\x92", "'", PlanFullName),    #clean plan names and full names
          PlanName = gsub("\x92", "'", PlanName)) %>% 
-  # filter(AdministeringGovt == 0) %>% 
+  # filter(AdministeringGovt == 0) %>% # state level 
   select(ppd_id, fy, PlanName, PlanFullName, StateName, 
-         ActLiabilities_GASB, MktAssets_net)
+         ActLiabilities_GASB, MktAssets_net) %>% 
 
 #Clean actuarial firm name data from Reason
 reason_data_clean_16_21 <- reason_data %>% 
@@ -85,10 +85,10 @@ actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>%
     
     #####
     #after checking with Zach, merge these together
-     str_detect(actuarial_firm_name, "(i?)Buck|Xerox|Conduent") ~ 
+     str_detect(actuarial_firm_name, "(?i)Buck|Xerox|Conduent") ~ 
                        "Conduent (formerly Buck and/or Xerox)",
     
-    str_detect(actuarial_firm_name,"(i?)Office Of The State Actuary")  ~ 
+    str_detect(actuarial_firm_name,"(?i)Office Of The State Actuary")  ~ 
                                     "Office of The State Actuary - Washington",
    
    str_detect(actuarial_firm_name, "(?i)State Actuary - Washington") ~
@@ -106,7 +106,7 @@ actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>%
     str_detect(actuarial_firm_name, "(?i)internal") ~
                                           "Internal Actuarial Services",
     
-    str_detect(actuarial_firm_name, "(i?)Korn") ~
+    str_detect(actuarial_firm_name, "(?i)Korn") ~
                     "Korn Ferry Hay Group",
                                          
     str_detect(actuarial_firm_name, "(?i)milliman") ~
@@ -123,17 +123,17 @@ actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>%
                                            "Dean Actuaries",
     
    # #other names:
- #                    str_detect(actuarial_firm_name, "(i?)California") ~
+ #                    str_detect(actuarial_firm_name, "(?i)California") ~
  #                    "California Public Employees’ Retirement System - Actuarial Office",
  #                
- #                    str_detect(actuarial_firm_name, "(i?)Bartel") ~
+ #                    str_detect(actuarial_firm_name, "(?i)Bartel") ~
  #                    "Bartel Associates",
  # 
- #                    str_detect(actuarial_firm_name, "(i?)Block") ~
+ #                    str_detect(actuarial_firm_name, "(?i)Block") ~
  #                    "Block Consulting Actuaries",
  #                  
  #          
- #                    str_detect(actuarial_firm_name, "(i?)Osborn") ~
+ #                    str_detect(actuarial_firm_name, "(?i)Osborn") ~
  #                    "Osborn, Carreiro & Associates",
  
                                          TRUE ~ actuarial_firm_name)) %>%
@@ -154,12 +154,14 @@ final_data_16_21  <- ppd_data_clean %>%
 
 # fill in firm names for those missing
   
-  #filter(is.na(actuarial_firm_name)) %>% 
+  #filter(is.na(actuarial_firm_name))  %>% 
   #-> 30 plans of 2021 & 3 plan of 2016 do not have actuarial firms name  --> need to join with supplemental
   left_join(actuarial_firm_supplemental) %>%  
   
   mutate(actuarial_firm_name = case_when(is.na(actuarial_firm_name) ~ actuarial_firm_name_supplemental, 
                                          TRUE ~ actuarial_firm_name)) %>% 
+  
+  
   ########
 #Note: Not following Truong's mutate below --> Eg. this join give result that in year 2016 Conduent has 17 instead of 21 plans as original. 
 
@@ -169,7 +171,7 @@ final_data_16_21  <- ppd_data_clean %>%
 #########
   
 
-# filter(is.na(actuarial_firm_name)) --> remaining 4 plans with no firms name 
+ #filter(is.na(actuarial_firm_name)) #--> remaining 4 plans with no firms name 
 
 #--> need to attribute by hand
 
@@ -197,20 +199,22 @@ TRUE ~ actuarial_firm_name))  %>%
          .after = MktAssets_net) %>% 
   
   ###
-  #filter(str_detect(actuarial_firm_name, "(i?)Buck|Xerox|Conduent")) %>% filter(fy == 2021)
+  #filter(str_detect(actuarial_firm_name, "(?i)Buck|Xerox|Conduent")) %>% filter(fy == 2021)
   
   ###
   mutate(across(ActLiabilities_GASB:UAL, ~.x * 1000)) %>% 
   filter(!is.na(actuarial_firm_name)) 
   
 # double-check names to make sure names are unique 
-final_data_16_21 %>% select(actuarial_firm_name) %>% distinct() %>% arrange(actuarial_firm_name)
+final_data_16_21 %>% 
+  #filter(fy == 2021) %>% 
+  select(actuarial_firm_name) %>% distinct() %>% arrange(actuarial_firm_name)  
+  #filter(actuarial_firm_name == "McGriff Employee Benefit Solutions")
 
 ```
 
 # Summary 
 ```{r}
-
 final_data_summary_16_21 <- final_data_16_21 %>% 
   group_by(actuarial_firm_name, fy) %>% 
   summarise(AAL = sum(ActLiabilities_GASB),

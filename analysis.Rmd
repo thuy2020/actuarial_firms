@@ -1,5 +1,5 @@
 ---
-title: "Actuarial Firms"
+title: "Actuarial Firms 2016 - 2021"
 output: html_document
 date: "2023-07-20"
 ---
@@ -39,7 +39,6 @@ final_data_16_21 %>% filter(fy == 2021) %>%
 # Virginia Retirement System 
 # 106643384000/1000000000
 ```
-
 
 
 ```{r}
@@ -133,6 +132,7 @@ add_row(actuarial_firm_name = "CalPERS", Year = 2016, AAL = 441500000000, UAL = 
 
 ```
 
+## Comparing top 5
 ```{r}
 compare_top5 %>% 
   filter(Year == 2021) %>% 
@@ -153,7 +153,8 @@ compare_top5 %>%
   theme_minimal() +
   theme(panel.grid.major.y = element_blank()) 
 ```
-# Number of plans by 15 firms
+
+# Number of plans by 15 firms - Comparing 2016-2021
 ```{r}
 num_plan_by_firm <- final_data_16_21 %>% select(actuarial_firm_name, fy) %>% 
   
@@ -172,9 +173,8 @@ num_plan_by_firm %>% filter(Year == 2021) %>% arrange(desc(number_plan))
 
 ```
 
-
+## Changes in number of plans by firm
 ```{r}
-# changes of number of plan by firm
 num_plan_by_firm %>% pivot_wider(
                                  names_from = Year,
                                  values_from = number_plan) %>% 
@@ -186,13 +186,18 @@ num_plan_by_firm %>% filter(Year == 2021)
 
 
 ```{r}
+
 num_plan_by_firm %>% 
   ggplot(aes(fct_reorder(actuarial_firm_name, number_plan), number_plan))+
   geom_segment(aes(xend = actuarial_firm_name, yend = 0), size = 1, color = "grey") +
+geom_segment(data = num_plan_by_firm %>% filter(actuarial_firm_name == "Conduent (formerly Buck and/or Xerox)"),
 
+               aes(xend = actuarial_firm_name, yend = 10), color = "red", size = 1
+               )+
   geom_point(aes(color = Year), 
              size = 6)+
   
+
    coord_flip()+
   labs(title = "Number of Plans by The Top 15 Firms  \n2016-2021",
         x = "",
@@ -201,9 +206,46 @@ num_plan_by_firm %>%
   scale_color_brewer(palette = "Set2")+
   theme(panel.grid.major.y = element_blank()) 
 ```
+
+## Double-check the case of Conduent (formerly Buck and/or Xerox): from 21 plans in 2016 to 8 plans in 2021
 ```{r}
-# check Conduent case - number of firms decreased 21 to 8
-final_data_16_21 %>% filter(str_detect(actuarial_firm_name, "Conduent")) %>% filter(fy == 2016) %>% select(PlanName) %>% arrange(PlanName)
+final_data_16_21 %>% filter(fy == 2016) %>% 
+  filter(str_detect(actuarial_firm_name, "(i?)Conduent")) %>% select(PlanName) -> conduent_16_PlanName
+```
+
+```{r}
+final_data_16_21 %>% filter(fy == 2021) %>% 
+  filter(str_detect(actuarial_firm_name, "(i?)Conduent")) %>% select(PlanName) -> conduent_21_PlanName
+
+# 4 plans in Reason data 
+actuarial_firm_data_16_21 %>% filter(str_detect(actuarial_firm_name, "(i?)Conduent")) %>% filter(fy == 2021)
+
+# pick up 4 more plans of 2021 NA --> pick up from supplemental file 
+actuarial_firm_supplemental %>% 
+  filter(str_detect(actuarial_firm_name_supplemental, "(?i)(Conduent)|(buck)|(Xerox)"))
+
+```
+
+Indeed, Conduent lost 13 plans to other firms. 
+ Vermont State Employees 2016: Buck
+https://www.vermonttreasurer.gov/sites/treasurer/files/VSERS/PDF/2016/VSERS%202016%20Valuation%20Report%20Final.pdf
+
+ Vermont State Employees 2021: Segal
+#https://www.vermonttreasurer.gov/sites/treasurer/files/2022%20VSERS%20GASB%2067%20Report.pdf
+
+ New Jersey PERS 2021: Cheiron
+ https://www.state.nj.us/treasury/pensions/documents/financial/studies/pers-exp-21.pdf
+
+
+ New Jersey Police & Fire 2021: Segal
+https://www.nj.gov/pfrs/documents/pdf/financial/PFRSNJ-GASB2022.pdf
+```{r}
+setdiff(conduent_16_PlanName, conduent_21_PlanName) -> conduent_losing_plans
+```
+
+```{r}
+final_data_16_21 %>% filter(fy == 2021) %>% 
+  filter(PlanName %in% conduent_losing_plans$PlanName) %>% select(fy, PlanName, actuarial_firm_name)
 ```
 
 
@@ -249,3 +291,8 @@ data %>%
 data %>% filter(UAL <0)
 
 ```
+
+
+
+
+
