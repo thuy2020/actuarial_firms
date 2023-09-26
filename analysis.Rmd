@@ -9,6 +9,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(stringr)
 library(ggplot2)
+library(forcats)
+library(tidyr)
 options(scipen = 999)
 ```
 
@@ -18,7 +20,7 @@ options(scipen = 999)
 final_data_16_21 %>% filter(fy == 2021) %>% select(PlanName) %>% distinct()
 
 # number of firms in 2021
-final_data_16_21 %>% filter(fy == 2021) %>% select(actuarial_firm_name) %>% distinct()
+final_data_16_21 %>% filter(fy == 2021) %>% select(actuarial_firm_name) %>% distinct() %>% arrange()
 ```
 
 
@@ -42,14 +44,14 @@ final_data_16_21 %>% filter(fy == 2021) %>%
 
 
 ```{r}
-data <- rio::import("Actuarial Firm Summary.xlsx", sheet = 2) %>% # shee2 = final_data_summary3_21
+data <- rio::import("Actuarial Firm Summary.xlsx", sheet = 2) %>% # sheet2 = final_data_summary3_21
  
-  add_column(firm_name_short = c("CalPERS", "Cavanaugh Macdonald", "Cheiron",
-                            "Conduent", "Foster & Foster", "GRS",
-                            "Internal Actuarial Services", "Korn Ferry Hay Group", "Milliman",
-                            "NYC Office of the Actuary", "NY State & LRS Actuary", "Nystrs Office of The Actuary", 
-                            "Office of The State Actuary - Washington", "PWC", "Segal", 
-                            "Others")) %>% 
+  # add_column(firm_name_short = c("CalPERS", "Cavanaugh Macdonald", "Cheiron",
+  #                           "Conduent", "Foster & Foster", "GRS",
+  #                           "Internal Actuarial Services", "Korn Ferry Hay Group", "Milliman",
+  #                           "NYC Office of the Actuary", "NY State & LRS Actuary", "Nystrs Office of The Actuary", 
+  #                           "Office of The State Actuary - Washington", "PWC", "Segal", 
+  #                           "Others")) %>% 
   mutate(AAL_percent = round(AAL_percent*100, 1),
          AAL_billion = round(AAL/1000000000),
          AAL_billion = paste0("$", AAL_billion, "B"),
@@ -67,21 +69,22 @@ data <- rio::import("Actuarial Firm Summary.xlsx", sheet = 2) %>% # shee2 = fina
 # Top 15 firms in 2021 AAL
 ```{r}
 data %>% 
-  ggplot(aes(fct_reorder(firm_name_short, AAL), AAL)) +
-  geom_col(fill = "#FF6632") +
+  ggplot(aes(fct_reorder(actuarial_firm_name, AAL), AAL)) +
+  geom_col(fill = "#FF7649") +
   geom_col(data = data %>% filter(actuarial_firm_name == "Others"), 
            fill = "gray")+
   
   geom_text(aes(label = AAL_billion), color = "black", size = 2, 
-            nudge_y = -30000000000) +
+            nudge_y = -50000000000) +
   coord_flip() +
   labs(x = "", 
-       y = "Actuarial Accrued Liability") +
+       y = "", 
+       title = "Actuarial Accrued Liability by Firm in 2021",
+       caption = "Source: Pension Integrity Project, Reason Foundation") +
   scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
                    label = c("$500B","$1T","$1.5T")) +
   theme(plot.margin = margin(2, 8, 6, 2, "pt")) +
   theme_minimal() 
-  
 ```
 
 ```{r}
@@ -118,9 +121,6 @@ final_data_16_21 %>% filter(fy == 2021) %>%
 
 compare_top5 <-  final_data_summary2_16 %>% rbind(final_data_summary2_21) %>% 
   select(-AAL_percent) %>% 
-  
-  # The data does not have CalPERS 2016. Use number in the article https://reason.org/commentary/grs-dominates-public-pension-actuarial-consulting-followed-by-milliman-and-cavanaugh-macdonald/
-add_row(actuarial_firm_name = "CalPERS", Year = 2016, AAL = 441500000000, UAL = 142000000000) %>% 
   arrange(desc(AAL)) %>% slice(1:10) %>% 
   
   select(-UAL) %>% 
@@ -133,26 +133,50 @@ add_row(actuarial_firm_name = "CalPERS", Year = 2016, AAL = 441500000000, UAL = 
 ```
 
 ## Comparing top 5
+
+Cavanaugh Macdonald saw the highest jump in percentage, 
+```{r}
+diff_2016_2021 <- compare_top5 %>% 
+  pivot_wider(names_from = "Year",
+              values_from = "aal_value") %>% 
+  mutate(grow_percent = paste0(round((`2021` - `2016`)*100/`2016`), "%"))
+
+grow_percent <- diff_2016_2021$grow_percent
+```
+
+From 2016 to 2021, GRS saw the most substantial leap in absolute AAL values, boasting a 26% surge, while Cavanaugh Macdonal experienced a 35% increase, CalPERs 33%, Segal 27%, and Milliman 16%. 
+
 ```{r}
 compare_top5 %>% 
-  filter(Year == 2021) %>% 
+  filter(Year == 2021) %>% cbind(grow_percent) %>% 
+  
   ggplot(aes(fct_reorder(actuarial_firm_name, aal_value), aal_value)) +
   geom_col(aes(y = aal_value, fill = Year))+
+  
+  # add the growth in percentage
+  geom_segment(aes(xend = actuarial_firm_name, #y = diff_2016_2021$`2021`,
+                   yend = diff_2016_2021$`2016`), size = 1, color = "black") +
 
+  geom_text(aes(label = grow_percent), color = "black", size = 3, nudge_x = .2, nudge_y = -50000000000) +
+ 
 #year 2016
   geom_col(data = compare_top5 %>% filter(Year == 2016),
             aes(y = aal_value, fill = Year), width = 0.5) +
    coord_flip() +
+  
   labs(x = "",
        y = "Actuarial Accrued Liability",
-       title = "Top Five Actuarial Firms by AAL Values") + 
+       title = "Top Five Actuaries by AAL Values",
+       caption = "Source: Pension Integrity Project, Reason Foundation") + 
   
-  scale_fill_manual(values = c("grey", "orange")) +
+  scale_fill_manual(values = c("#4B6385", "#FF7649")) +
   scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
                    label = c("$500B","$1T","$1.5T"))+
   theme_minimal() +
   theme(panel.grid.major.y = element_blank()) 
 ```
+
+
 
 # Number of plans by 15 firms - Comparing 2016-2021
 ```{r}
@@ -190,43 +214,40 @@ num_plan_by_firm %>% filter(Year == 2021)
 num_plan_by_firm %>% 
   ggplot(aes(fct_reorder(actuarial_firm_name, number_plan), number_plan))+
   geom_segment(aes(xend = actuarial_firm_name, yend = 0), size = 1, color = "grey") +
-geom_segment(data = num_plan_by_firm %>% filter(actuarial_firm_name == "Conduent (formerly Buck and/or Xerox)"),
-
-               aes(xend = actuarial_firm_name, yend = 10), color = "red", size = 1
-               )+
-  geom_point(aes(color = Year), 
-             size = 6)+
+  geom_segment(data = num_plan_by_firm %>% filter(actuarial_firm_name == "Buck"),
+               aes(xend = actuarial_firm_name, yend = 10), color = "red", size = 1)+
   
-
-   coord_flip()+
-  labs(title = "Number of Plans by The Top 15 Firms  \n2016-2021",
+  geom_point(aes(color = Year), 
+             size = 6)+ 
+  scale_color_manual(values = c("2016" = "black", "2021" = "#238B21")) +
+  coord_flip()+
+  
+  labs(title = "Number of Plans by The Top 15 Actuaries  \n2016-2021",
         x = "",
-       y = "Number of plans") + 
+       y = "Number of plans", 
+       caption = "Source: Pension Integrity Project, Reason Foundation") + 
   theme_minimal() +
-  scale_color_brewer(palette = "Set2")+
   theme(panel.grid.major.y = element_blank()) 
 ```
 
-## Double-check the case of Conduent (formerly Buck and/or Xerox): from 21 plans in 2016 to 8 plans in 2021
+## Double-check the case of Buck: from 21 plans in 2016 to 8 plans in 2021
 ```{r}
-final_data_16_21 %>% filter(fy == 2016) %>% 
-  filter(str_detect(actuarial_firm_name, "(i?)Conduent")) %>% select(PlanName) -> conduent_16_PlanName
-```
+buck_16_PlanName <- final_data_16_21 %>% filter(fy == 2016) %>% 
+  filter(str_detect(actuarial_firm_name, "(i?)Buck")) %>% select(PlanName) 
 
-```{r}
-final_data_16_21 %>% filter(fy == 2021) %>% 
-  filter(str_detect(actuarial_firm_name, "(i?)Conduent")) %>% select(PlanName) -> conduent_21_PlanName
+buck_21_PlanName <- final_data_16_21 %>% filter(fy == 2021) %>% 
+  filter(str_detect(actuarial_firm_name, "(i?)Buck")) %>% select(PlanName) 
 
 # 4 plans in Reason data 
-actuarial_firm_data_16_21 %>% filter(str_detect(actuarial_firm_name, "(i?)Conduent")) %>% filter(fy == 2021)
+actuarial_firm_data_16_21 %>% filter(str_detect(actuarial_firm_name, "(i?)Buck")) %>% filter(fy == 2021)
 
 # pick up 4 more plans of 2021 NA --> pick up from supplemental file 
 actuarial_firm_supplemental %>% 
-  filter(str_detect(actuarial_firm_name_supplemental, "(?i)(Conduent)|(buck)|(Xerox)"))
+  filter(str_detect(actuarial_firm_name_supplemental, "(?i)Buck"))
 
 ```
 
-Indeed, Conduent lost 13 plans to other firms. 
+Indeed, Buck lost 13 plans to other firms. 
  Vermont State Employees 2016: Buck
 https://www.vermonttreasurer.gov/sites/treasurer/files/VSERS/PDF/2016/VSERS%202016%20Valuation%20Report%20Final.pdf
 
@@ -240,32 +261,52 @@ https://www.vermonttreasurer.gov/sites/treasurer/files/VSERS/PDF/2016/VSERS%2020
  New Jersey Police & Fire 2021: Segal
 https://www.nj.gov/pfrs/documents/pdf/financial/PFRSNJ-GASB2022.pdf
 ```{r}
-setdiff(conduent_16_PlanName, conduent_21_PlanName) -> conduent_losing_plans
+buck_losing_plans <- setdiff(buck_16_PlanName, buck_21_PlanName) 
 ```
 
 ```{r}
 final_data_16_21 %>% filter(fy == 2021) %>% 
-  filter(PlanName %in% conduent_losing_plans$PlanName) %>% select(fy, PlanName, actuarial_firm_name)
+  filter(PlanName %in% buck_losing_plans$PlanName) %>% select(fy, PlanName, actuarial_firm_name)
 ```
-
 
 # Percentage share
 
 ```{r}
+library(waffle)
 d_waffle_percentshare <- final_data_summary3_21 %>% select(actuarial_firm_name, AAL_percent) %>% 
-  mutate(AAL_percent = round(AAL_percent*100)) %>% arrange(desc(AAL_percent))
+  mutate(AAL_percent = round(AAL_percent*100)) %>% arrange(desc(AAL_percent)) %>% 
+  mutate(Other = 100 - sum(AAL_percent[1:5]))
 
-waffle(c(GRS = 24, CMC = 15, Millian = 13, Segal = 11, CalPERS = 10, 
+waffle(c(GRS = 24, CMC = 15, Millian = 13, Segal = 11, CalPERS = 10,
          `Others` = 100-24-15-13-11-10), rows = 5,
-         title = "Percentage share of AAL by firms\n") +
+         title = "Percentage share of AAL by actuaries\n") +
   coord_equal() +
-  labs(caption = "Note: Percentages are rounded up the nearest integers", size = 0.1) +
+  labs(caption = "Note: Percentages are rounded up the nearest integers\nSource: Pension Integrity Project, Reason Foundation", size = 0.1) +
+  scale_fill_manual(name = NULL,
+                    values = c("#2E5079", "#3D5A42", "#0F9195", "#7FCDA1", "#B3BC92", "lightgrey")) +
+  theme_void()
+```
+
+
+```{r}
+waffle(unlist(c(GRS = d_waffle_percentshare[1,2], 
+         CMC = d_waffle_percentshare[2,2], 
+         Millian = d_waffle_percentshare[3,2], 
+         Segal = d_waffle_percentshare[4,2], 
+         CalPERS = d_waffle_percentshare[5,2], 
+         `Others` = d_waffle_percentshare [1,3])), 
+       
+          rows = 5,
+         title = "Percentage share of AAL by actuaries\n") +
+  coord_equal() +
+  labs(caption = "Note: Percentages are rounded up the nearest integers\nSource: Pension Integrity Project, Reason Foundation", size = 0.1) +
   scale_fill_manual(name = NULL,
                     values = c("#2E5079", "#3D5A42", "#0F9195", "#7FCDA1", "#B3BC92", "lightgrey")) +
   theme_void()
 
 
 ```
+
 # Top 15 firms in 2021 UAL
 ```{r}
 data %>% 
@@ -278,9 +319,11 @@ data %>%
             nudge_y = -20000000000) +
   coord_flip() +
   labs(x = "", 
-       y = "UAL") +
-  scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
-                   label = c("$500B","$1T","$1.5T")) +
+       y = "",
+       title = "Unfunded Liabilities by Actuary in 2021",
+       caption = "Source: Pension Integrity Project, Reason Foundation") +
+  scale_y_continuous(breaks = c(100000000000, 200000000000),
+                   label = c("$100B", "$200B")) +
   theme(plot.margin = margin(2, 8, 6, 2, "pt")) +
   theme_minimal() 
 
@@ -292,6 +335,53 @@ data %>% filter(UAL <0)
 
 ```
 
+```{r}
+ # Chart Unfunded Liabilities: how about just look at independent actuaries
+# Remove all internal firms: Calper, NY, internal  
+# theory: internal firms use different discount rates --> check that number.
+
+data %>% 
+  ggplot(aes(fct_reorder(actuarial_firm_name, UAL), UAL, fill = actuarial_firm_name)) +
+  geom_col(
+    fill = "#0F9195") +
+  
+    # internal service
+  geom_col(data = data %>% filter(actuarial_firm_name %in% c("CalPERS", "New York City Office of the Actuary", "New York State and Local Retirement Systems' Actuary", "Office of The State Actuary - Washington", "Public Employee Retirement Administration Commission", "Nystrs Office Of The Actuary" )), 
+           fill = "#82C18F") +
+  
+  geom_col(data = data %>% filter(actuarial_firm_name == "Others"), 
+           fill = "gray")+
+  
+  geom_text(aes(label = UAL_billion), color = "black", size = 2, 
+            nudge_y = -10000000000) +
+  
+  # manually create a legend
+  
+  geom_segment(data = data %>% filter(actuarial_firm_name == "Korn Ferry Hay Group"),
+               aes(xend = actuarial_firm_name , y = 250000000000, yend = 200000000000), color = "#0F9195", size = 10)+
+  annotate("text", x = 6, y = 140000000000, label = "Independent Actuaries", size = 3) +
+  
+  
+ geom_segment(data = data %>% filter(actuarial_firm_name == "New York City Office of the Actuary"),
+               aes(xend = actuarial_firm_name , y = 250000000000, yend = 200000000000), color = "#82C18F", size = 10)+
+  annotate("text", x = 5, y = 150000000000, label = "Internal Services", size = 3) +
+  
+  
+  scale_color_manual(values = c("Independent Actuaries" = "#0F9195", 
+                                "Internal Services" = "#82C18F")) +
+  
+  coord_flip() +
+  labs(x = "", 
+       y = "",
+       title = "Unfunded Liabilities by Actuary in 2021",
+       caption = "Source: Pension Integrity Project, Reason Foundation") +
+  scale_y_continuous(breaks = c(100000000000, 200000000000),
+                   label = c("$100B", "$200B")) +
+  
+  theme(#plot.margin = margin(2, 8, 6, 2, "pt"),
+        legend.position = "bottom") +
+  theme_minimal() 
+```
 
 
 
