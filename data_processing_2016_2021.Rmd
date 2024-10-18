@@ -35,15 +35,24 @@ actuarial_firm_supplemental <- import("data/actuarial firm supplemental.xlsx") %
                        "Segal",
   
   TRUE ~ actuarial_firm_name_supplemental))
+
 #check unique names
 actuarial_firm_supplemental %>% select(actuarial_firm_name_supplemental) %>% distinct() %>% arrange()
 ```
 # Clean PPD data
 ```{r}
+  # mutate(PlanFullName = gsub("\x92", "'", PlanFullName),    
+  #        PlanName = gsub("\x92", "'", PlanName)) %>% 
+
 ppd_data_clean <- ppd_data %>% 
-  mutate(PlanFullName = gsub("\x92", "'", PlanFullName),    #clean plan names and full names
-         PlanName = gsub("\x92", "'", PlanName)) %>% 
-  # filter(AdministeringGovt == 0) %>% # state level 
+  # non-ASCII characters (e.g., �) --> need to Handle encoding issues
+  mutate(
+    PlanFullName = iconv(PlanFullName, from = "UTF-8", to = "ASCII", sub = ""),
+    PlanName = iconv(PlanName, from = "UTF-8", to = "ASCII", sub = "")
+  ) %>% 
+           #clean plan names and full names
+  mutate(PlanFullName = gsub("[^a-zA-Z\\s]", "'", PlanFullName),    
+         PlanName = gsub("[^a-zA-Z\\s]", "'", PlanName)) %>%
   select(ppd_id, fy, PlanName, PlanFullName, StateName, 
          ActLiabilities_GASB, MktAssets_net)  
 
@@ -64,7 +73,7 @@ select(actuarial_firm_name) %>% distinct() %>% arrange(actuarial_firm_name)
 #--> Problem: a great variation of names, total 83 --> need to unify them below
 ```
 
-# Acturies' names from Reason data
+# Actuaries' names from Reason data
 ```{r}
 actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>% 
   filter(master_attribute_name == "Actuarial Firm") %>% 
@@ -122,18 +131,16 @@ actuarial_firm_data_16_21 <- reason_data_clean_16_21 %>%
                                            "Dean Actuaries",
 
                                          TRUE ~ actuarial_firm_name)) %>%
-  select(-plan_id, plan_name) %>% distinct()
+  select(-plan_id, plan_name) %>% distinct() %>% 
   
+  # Remove duplicated  
+  filter(plan_name != "Arizona Public Safety Personnel Retirement System - Tier 3")
   
 actuarial_firm_data_16_21 %>% 
    select(actuarial_firm_name) %>% arrange(actuarial_firm_name) %>% 
    distinct() #%>% write.csv("distinct_firms_list.csv")
 ```
 
-
- # Chart Unfunded Liabilities: how about just look at independent actuaries
-# Remove all internal firms: Calper, NY, internal  
-  # theory: internal firms use different discount rates --> check that number.
 
 # Join PPD data with actuaries' name data and calculate relevant stats
 ```{r}
@@ -182,14 +189,11 @@ TRUE ~ actuarial_firm_name))  %>%
 mutate(actuarial_firm_name = str_replace(actuarial_firm_name, "Usi Consulting Group", "USI Consulting Group")
 ) %>% 
 
-# double check to make sure all plans have actuarial firm names
-#  filter(is.na(actuarial_firm_name))
-  
 # Calculate UAL  
   mutate(UAL = ActLiabilities_GASB - MktAssets_net,
          .after = MktAssets_net) %>% 
-  mutate(across(ActLiabilities_GASB:UAL, ~.x * 1000)) %>% 
-  filter(!is.na(actuarial_firm_name)) 
+  filter(!is.na(actuarial_firm_name)) %>% 
+  mutate(across(ActLiabilities_GASB:UAL, ~if (is.numeric(.x)) .x * 1000 else .x)) 
   
 
 # double-check names to make sure names are unique 
@@ -209,8 +213,6 @@ final_data_summary_16_21 <- final_data_16_21 %>%
   ungroup() %>% 
   mutate(AAL_percent = AAL / sum(AAL), .after = AAL) %>% 
   arrange(desc(AAL))
-
-final_data_summary_16_21 %>% filter(fy == 2021) 
   
 ```
 
@@ -250,6 +252,11 @@ data_list_16_21 <- list("Actuarial Firm Summary16_21" = final_data_summary_16_21
 
 export(data_list_16_21, "Actuarial Firm Summary.xlsx")
 
+# Export as requested by Winklevoss
+data_list_Winklevoss <- list("Actuarial Firm Summary16_21" = final_data_summary_16_21,
+                  "All_plans" = final_data_16_21)
+
+export(data_list_Winklevoss, "Actuarial Firms Summary_Allplans.xlsx")
 
 ```
 

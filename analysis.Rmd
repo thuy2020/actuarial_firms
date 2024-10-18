@@ -12,15 +12,28 @@ library(ggplot2)
 library(forcats)
 library(tidyr)
 options(scipen = 999)
+#GGsave has grey background --> override the ggsave function
+ggsave <- function(..., bg = 'white') ggplot2::ggsave(..., bg = bg)
 ```
 
 # Numbers as appeared in the commentary:
 ```{r}
 # number of plan in 2021
-final_data_16_21 %>% filter(fy == 2021) %>% select(PlanName) %>% distinct()
+final_data_16_21 %>% filter(fy == 2021) %>% 
+  select(PlanName) %>% distinct()
+
 
 # number of firms in 2021
 final_data_16_21 %>% filter(fy == 2021) %>% select(actuarial_firm_name) %>% distinct() %>% arrange()
+
+
+# 209 plans share of all US public plans: 
+# Cencus 2021 records: 5605866299000
+
+final_data_16_21 %>% filter(fy == 2021) %>% 
+  mutate(tot=sum(MktAssets_net)) %>% select(tot)
+5099420454166/5605866299000
+
 ```
 
 
@@ -84,7 +97,10 @@ data %>%
   scale_y_continuous(breaks = c(500000000000, 1000000000000, 1490000000000),
                    label = c("$500B","$1T","$1.5T")) +
   theme(plot.margin = margin(2, 8, 6, 2, "pt")) +
-  theme_minimal() 
+  theme_minimal()  
+
+
+  ggsave("liability_by_firm_2021.png")
 ```
 
 ```{r}
@@ -166,7 +182,7 @@ compare_top5 %>%
   
   labs(x = "",
        y = "Actuarial Accrued Liability",
-       title = "Top Five Actuaries by AAL Values",
+       title = "Change in AAL Values Assigned to Top Five Actuaries",
        caption = "Source: Pension Integrity Project, Reason Foundation") + 
   
   scale_fill_manual(values = c("#4B6385", "#FF7649")) +
@@ -174,6 +190,8 @@ compare_top5 %>%
                    label = c("$500B","$1T","$1.5T"))+
   theme_minimal() +
   theme(panel.grid.major.y = element_blank()) 
+
+ggsave("change_AAL_top5.png")
 ```
 
 
@@ -190,10 +208,6 @@ num_plan_by_firm <- final_data_16_21 %>% select(actuarial_firm_name, fy) %>%
          Year = fy) %>% 
   mutate(Year = as.character(Year)) %>% 
   distinct()
-
-
-# firms name by number of plan year 2021
-num_plan_by_firm %>% filter(Year == 2021) %>% arrange(desc(number_plan))
 
 ```
 
@@ -228,6 +242,7 @@ num_plan_by_firm %>%
        caption = "Source: Pension Integrity Project, Reason Foundation") + 
   theme_minimal() +
   theme(panel.grid.major.y = element_blank()) 
+ggsave("number_plans_top15.png")
 ```
 
 ## Double-check the case of Buck: from 21 plans in 2016 to 8 plans in 2021
@@ -279,12 +294,14 @@ d_waffle_percentshare <- final_data_summary3_21 %>% select(actuarial_firm_name, 
 
 waffle(c(GRS = 24, CMC = 15, Millian = 13, Segal = 11, CalPERS = 10,
          `Others` = 100-24-15-13-11-10), rows = 5,
-         title = "Percentage share of AAL by actuaries\n") +
+         title = "Share of National Pension Liabilities by Actuarial Firms") +
   coord_equal() +
   labs(caption = "Note: Percentages are rounded up the nearest integers\nSource: Pension Integrity Project, Reason Foundation", size = 0.1) +
   scale_fill_manual(name = NULL,
                     values = c("#2E5079", "#3D5A42", "#0F9195", "#7FCDA1", "#B3BC92", "lightgrey")) +
   theme_void()
+
+ggsave("share_national_liabilities.png")
 ```
 
 
@@ -381,6 +398,8 @@ data %>%
   theme(#plot.margin = margin(2, 8, 6, 2, "pt"),
         legend.position = "bottom") +
   theme_minimal() 
+
+ggsave("unfunded_liabilities_2021.png")
 ```
 
 
